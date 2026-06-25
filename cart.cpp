@@ -161,44 +161,51 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
 
    // Make some space for the new carts
 
-   mCartBank0 = (UBYTE*) new UBYTE[mMaskBank0+1];
-   mCartBank1 = (UBYTE*) new UBYTE[mMaskBank1+1];
    mCartBank0A = NULL;
    mCartBank1A = NULL;
 
-   memset(mCartBank0, DEFAULT_CART_CONTENTS, mMaskBank0+1);
-   memset(mCartBank1, DEFAULT_CART_CONTENTS, mMaskBank1+1);
-
-   // Stop here if running homebrew from RAM
-   if (!gamedata)
+   // Stop here if running homebrew from RAM (no flash ROM): allocate writable
+   // RAM banks (nothing to XIP from).
+   if (!gamedata) {
+      mCartBank0 = (UBYTE*) new UBYTE[mMaskBank0+1];
+      mCartBank1 = (UBYTE*) new UBYTE[mMaskBank1+1];
+      memset(mCartBank0, DEFAULT_CART_CONTENTS, mMaskBank0+1);
+      memset(mCartBank1, DEFAULT_CART_CONTENTS, mMaskBank1+1);
       return;
+   }
 
    log_printf("Cart name='%s', crc32=%08X, bank0=%d, bank1=%d\n",
       mFileHeader.cartname, mCRC32, mMaskBank0+1, mMaskBank1+1);
 
-   // TODO: the following code to read the banks is not very nice .. should be reworked
-   // TODO: actually its dangerous, if more than one bank is used ... (only homebrews)
    int cartsize = gamesize;
    int bank0size = __min(cartsize, (int)(mMaskBank0+1));
    int bank1size = __min(cartsize, (int)(mMaskBank1+1));
    if(bank0size==1) bank0size=0;// workaround ...
    if(bank1size==1) bank1size=0;// workaround ...
 
-   memcpy(mCartBank0, gamedata, bank0size);
+   /* GNW XIP: bank0 is read-only here -- Poke0/Poke0A are no-ops and
+    * mWriteEnableBank0 is never set -- so point it straight at the
+    * flash-resident (memory-mapped QSPI XIP) ROM instead of new[]+memcpy.
+    * Saves up to 256KB of RAM per bank0 and lets large / Audin carts (e.g. APB)
+    * fit. bank1 must stay in writable RAM because Poke1 writes into it when
+    * mWriteEnableBank1 is set. gamedata already points past the LYNX header and
+    * lives in flash (getromdata -> odroid_overlay_cache_file_in_flash). The
+    * custom heap's delete[] is a no-op, so ~CCart deleting a flash pointer is
+    * harmless. */
+   mCartBank0 = (UBYTE*) gamedata;
    cartsize = __max(0, cartsize - bank0size);
 
+   mCartBank1 = (UBYTE*) new UBYTE[mMaskBank1+1];
+   memset(mCartBank1, DEFAULT_CART_CONTENTS, mMaskBank1+1);
    memcpy(mCartBank1, gamedata+bank0size, __min(cartsize, bank1size));
    cartsize = __max(0, cartsize - bank1size);
 
-   if (CartGetAudin()){// TODO clean up code
-      mCartBank0A = (UBYTE*) new UBYTE[mMaskBank0+1];
-      mCartBank1A = (UBYTE*) new UBYTE[mMaskBank1+1];
-      memset(mCartBank0A, DEFAULT_CART_CONTENTS, mMaskBank0+1);
-      memset(mCartBank1A, DEFAULT_CART_CONTENTS, mMaskBank1+1);
-
-      memcpy(mCartBank0A, gamedata+(bank0size+bank1size), __min(cartsize, bank0size));
+   if (CartGetAudin()){
+      mCartBank0A = (UBYTE*) (gamedata + (bank0size + bank1size));   // XIP, read-only
       cartsize = __max(0, cartsize - bank0size);
 
+      mCartBank1A = (UBYTE*) new UBYTE[mMaskBank1+1];                // writable -> RAM
+      memset(mCartBank1A, DEFAULT_CART_CONTENTS, mMaskBank1+1);
       memcpy(mCartBank1A, gamedata+(bank0size+bank1size+bank0size), __min(cartsize, bank1size));
       cartsize = __max(0, cartsize - bank1size);
    }
