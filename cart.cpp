@@ -201,6 +201,9 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
       memset(mCartBank0, DEFAULT_CART_CONTENTS, mMaskBank0+1);
       memcpy(mCartBank0, gamedata, bank0size);
    }
+   log_printf("[lynx] bank0 %s @%p (size=%d mask+1=%d gamesize=%d)\n",
+      (bank0size >= (int)(mMaskBank0+1)) ? "XIP" : "RAM",
+      (void*)mCartBank0, bank0size, (int)(mMaskBank0+1), (int)gamesize);
    cartsize = __max(0, cartsize - bank0size);
 
    mCartBank1 = (UBYTE*) new UBYTE[mMaskBank1+1];
@@ -210,7 +213,8 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
 
    if (CartGetAudin()){
       int bank0Aoff = bank0size + bank1size;
-      if (bank0Aoff + (int)(mMaskBank0+1) <= (int)gamesize) {
+      bool bank0A_xip = (bank0Aoff + (int)(mMaskBank0+1) <= (int)gamesize);
+      if (bank0A_xip) {
          mCartBank0A = (UBYTE*) (gamedata + bank0Aoff);     // full bank0A -> XIP
       } else {
          int avail = __max(0, (int)gamesize - bank0Aoff);
@@ -218,6 +222,8 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
          memset(mCartBank0A, DEFAULT_CART_CONTENTS, mMaskBank0+1);
          memcpy(mCartBank0A, gamedata+bank0Aoff, __min(avail, (int)(mMaskBank0+1)));
       }
+      log_printf("[lynx] bank0A %s @%p (off=%d gamesize=%d)\n",
+         bank0A_xip ? "XIP" : "RAM", (void*)mCartBank0A, bank0Aoff, (int)gamesize);
       cartsize = __max(0, cartsize - bank0size);
 
       mCartBank1A = (UBYTE*) new UBYTE[mMaskBank1+1];                // writable -> RAM
