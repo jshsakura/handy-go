@@ -192,7 +192,15 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
     * lives in flash (getromdata -> odroid_overlay_cache_file_in_flash). The
     * custom heap's delete[] is a no-op, so ~CCart deleting a flash pointer is
     * harmless. */
-   mCartBank0 = (UBYTE*) gamedata;
+   // Only XIP when the FULL bank is present in the flashed file; otherwise the
+   // core would read past the cached ROM (OOB flash). Short ROM -> RAM + 0xFF pad.
+   if (bank0size >= (int)(mMaskBank0+1)) {
+      mCartBank0 = (UBYTE*) gamedata;                       // full bank0 -> XIP
+   } else {
+      mCartBank0 = (UBYTE*) new UBYTE[mMaskBank0+1];
+      memset(mCartBank0, DEFAULT_CART_CONTENTS, mMaskBank0+1);
+      memcpy(mCartBank0, gamedata, bank0size);
+   }
    cartsize = __max(0, cartsize - bank0size);
 
    mCartBank1 = (UBYTE*) new UBYTE[mMaskBank1+1];
@@ -201,7 +209,15 @@ CCart::CCart(const UBYTE *gamedata,ULONG gamesize)
    cartsize = __max(0, cartsize - bank1size);
 
    if (CartGetAudin()){
-      mCartBank0A = (UBYTE*) (gamedata + (bank0size + bank1size));   // XIP, read-only
+      int bank0Aoff = bank0size + bank1size;
+      if (bank0Aoff + (int)(mMaskBank0+1) <= (int)gamesize) {
+         mCartBank0A = (UBYTE*) (gamedata + bank0Aoff);     // full bank0A -> XIP
+      } else {
+         int avail = __max(0, (int)gamesize - bank0Aoff);
+         mCartBank0A = (UBYTE*) new UBYTE[mMaskBank0+1];    // missing/partial -> RAM + pad
+         memset(mCartBank0A, DEFAULT_CART_CONTENTS, mMaskBank0+1);
+         memcpy(mCartBank0A, gamedata+bank0Aoff, __min(avail, (int)(mMaskBank0+1)));
+      }
       cartsize = __max(0, cartsize - bank0size);
 
       mCartBank1A = (UBYTE*) new UBYTE[mMaskBank1+1];                // writable -> RAM
