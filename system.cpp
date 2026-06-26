@@ -472,12 +472,29 @@ void CSystem::UpdateFrame(bool draw)
          break;
       }
 #endif
+#ifdef TARGET_GNW
+      static int _ufdbg = 1;
+      if (_ufdbg) printf("[lynx] UF iter cyc=%lu next=%lu\n",
+                         (unsigned long)gSystemCycleCount, (unsigned long)gNextTimerEvent);
+#endif
       if(gSystemCycleCount>=gNextTimerEvent)
       {
+#ifdef TARGET_GNW
+         if (_ufdbg) printf("[lynx] UF ->mikie\n");
+#endif
          mMikie->Update();
+#ifdef TARGET_GNW
+         if (_ufdbg) printf("[lynx] UF mikie ok\n");
+#endif
       }
 
+#ifdef TARGET_GNW
+      if (_ufdbg) printf("[lynx] UF ->cpu\n");
+#endif
       mCpu->Update();
+#ifdef TARGET_GNW
+      if (_ufdbg) { printf("[lynx] UF cpu ok\n"); _ufdbg = 0; }
+#endif
 
    #ifdef _LYNXDBG
             // Check breakpoint
