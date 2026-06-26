@@ -443,13 +443,35 @@ bool CSystem::ContextLoad(LSS_FILE *fp)
    return status;
 }
 
+#ifdef TARGET_GNW
+#include <stdio.h>
+extern "C" void wdog_refresh(void);
+#endif
+
 void CSystem::UpdateFrame(bool draw)
 {
    gEndOfFrame = FALSE;
    gRenderFrame = draw;
 
+#ifdef TARGET_GNW
+   unsigned long _ufguard = 0;
+#endif
    while(gEndOfFrame != TRUE)
    {
+#ifdef TARGET_GNW
+      /* DIAG/safety: device hangs in this loop (gEndOfFrame never set) for some
+       * carts though it runs fine on host/qemu. Keep the watchdog alive during a
+       * long/stuck frame, and if it truly never ends, dump the stuck state and
+       * bail so we get a log instead of a silent watchdog reset to the menu. */
+      if ((++_ufguard & 0x1FFFFul) == 0) wdog_refresh();
+      if (_ufguard > 4000000ul)
+      {
+         printf("[lynx] UF STUCK cyc=%lu next=%lu eof=%lu sleep=%lu\n",
+                (unsigned long)gSystemCycleCount, (unsigned long)gNextTimerEvent,
+                (unsigned long)gEndOfFrame, (unsigned long)gSystemCPUSleep);
+         break;
+      }
+#endif
       if(gSystemCycleCount>=gNextTimerEvent)
       {
          mMikie->Update();
