@@ -64,15 +64,20 @@ class CRam : public CLynxBase
       CRam(const UBYTE *filedata, ULONG filesize)
       {
          if (filedata && filesize > 64 && memcmp(filedata + 6, "BS93", 4) == 0) {
-            #ifdef MSB_FIRST
-            mHomebrewAddr = filedata[2] << 8 | filedata[3];
-            mHomebrewSize = filedata[4] << 8 | filedata[5];
-            #else
-            mHomebrewAddr = filedata[3] << 8 | filedata[2];
-            mHomebrewSize = filedata[5] << 8 | filedata[4];
-            #endif
+            /* GNW FIX: BS93 header fields (load addr @2-3, size @4-5) are
+             * BIG-ENDIAN. The old "#ifndef MSB_FIRST" path read them little-
+             * endian on our LE host/device -> wrong addr (Lode Runner got
+             * 0x0002) which underflowed at "addr-=10" and OOB-wrote the 64K
+             * RAM (ASan-confirmed SEGV in CRam::Reset). Read big-endian. */
+            mHomebrewAddr = (filedata[2] << 8) | filedata[3];
+            mHomebrewSize = (filedata[4] << 8) | filedata[5];
             mHomebrewSize = filesize > mHomebrewSize ? mHomebrewSize : filesize;
             mHomebrewAddr -= 10;
+            /* defence-in-depth: never let a malformed BS93 header push the RAM
+             * load out of the 64K buffer (clamp instead of OOB-writing). */
+            if (mHomebrewAddr >= RAM_SIZE) mHomebrewAddr = 0;
+            if (mHomebrewSize > RAM_SIZE - mHomebrewAddr)
+               mHomebrewSize = RAM_SIZE - mHomebrewAddr;
             mHomebrewData = new UBYTE[mHomebrewSize];
             memcpy(mHomebrewData, filedata, mHomebrewSize);
             log_printf("Homebrew found: size=%u, addr=0x%04X\n", (unsigned int)mHomebrewSize, (unsigned int)mHomebrewAddr);

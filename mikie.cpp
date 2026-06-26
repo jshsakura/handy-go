@@ -950,7 +950,7 @@ inline ULONG CMikie::DisplayRenderLine(void)
          case MIKIE_ROTATE_L:
             for(loop=0;loop<HANDY_SCREEN_WIDTH/2;loop++)
             {
-               source=mpRamPointer[mLynxAddr];
+               source=mpRamPointer[mLynxAddr & (RAM_SIZE - 1)];  /* GNW: wrap 16-bit, was OOB read past 64K CRam (ASan) */
                if(mDISPCTL_Flip)
                {
                   mLynxAddr--;
@@ -975,7 +975,7 @@ inline ULONG CMikie::DisplayRenderLine(void)
 			case MIKIE_ROTATE_R:
             for(loop=0;loop<HANDY_SCREEN_WIDTH/2;loop++)
             {
-               source=mpRamPointer[mLynxAddr];
+               source=mpRamPointer[mLynxAddr & (RAM_SIZE - 1)];  /* GNW: wrap 16-bit, was OOB read past 64K CRam (ASan) */
                if(mDISPCTL_Flip)
                {
                   mLynxAddr--;
@@ -998,7 +998,7 @@ inline ULONG CMikie::DisplayRenderLine(void)
 			default:
             for(loop=0;loop<HANDY_SCREEN_WIDTH/2;loop++)
             {
-               source=mpRamPointer[mLynxAddr];
+               source=mpRamPointer[mLynxAddr & (RAM_SIZE - 1)];  /* GNW: wrap 16-bit, was OOB read past 64K CRam (ASan) */
                if(mDISPCTL_Flip)
                {
                   mLynxAddr--;
