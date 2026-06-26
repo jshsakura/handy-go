@@ -3365,6 +3365,17 @@ inline void CMikie::UpdateSound(void)
 {
    int samples = (gSystemCycleCount-gAudioLastUpdateCycle)/HANDY_AUDIO_SAMPLE_PERIOD;
    if (samples == 0) return;
+   /* GNW FIX: at boot gAudioLastUpdateCycle is 0; the CPU-sleep fast-forward of
+    * gSystemCycleCount to 0xFFFFFFFF plus the 0x80000000 rebase (above) underflows
+    * it, so this gap becomes ~8.5M samples and the loop below ran for seconds on
+    * the (slow) device -> watchdog reset to the menu (harmless on the fast host,
+    * which is why it never reproduced). A real frame is <~1100 samples, so any
+    * absurd count is the underflow case: resync to now and emit nothing. */
+   if (samples < 0 || samples > HANDY_AUDIO_BUFFER_LENGTH)
+   {
+      gAudioLastUpdateCycle = gSystemCycleCount;
+      return;
+   }
 
    int cur_lsample = 0;
    int cur_rsample = 0;
