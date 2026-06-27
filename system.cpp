@@ -443,13 +443,25 @@ bool CSystem::ContextLoad(LSS_FILE *fp)
    return status;
 }
 
+#ifdef TARGET_GNW
+extern "C" void wdog_refresh(void);
+#endif
+
 void CSystem::UpdateFrame(bool draw)
 {
    gEndOfFrame = FALSE;
    gRenderFrame = draw;
 
+#ifdef TARGET_GNW
+   unsigned long _wd = 0;
+#endif
    while(gEndOfFrame != TRUE)
    {
+#ifdef TARGET_GNW
+      /* Keep the hardware watchdog alive during a long emulated frame so the
+       * device never resets mid-UpdateFrame (cheap: ~once per 128K iterations). */
+      if ((++_wd & 0x1FFFFul) == 0) wdog_refresh();
+#endif
       if(gSystemCycleCount>=gNextTimerEvent)
       {
          mMikie->Update();
