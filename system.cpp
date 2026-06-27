@@ -443,48 +443,15 @@ bool CSystem::ContextLoad(LSS_FILE *fp)
    return status;
 }
 
-#ifdef TARGET_GNW
-#include <stdio.h>
-extern "C" void wdog_refresh(void);
-#endif
-
 void CSystem::UpdateFrame(bool draw)
 {
    gEndOfFrame = FALSE;
    gRenderFrame = draw;
 
-#ifdef TARGET_GNW
-   unsigned long _ufguard = 0;
-#endif
    while(gEndOfFrame != TRUE)
    {
-#ifdef TARGET_GNW
-      /* DIAG/safety: device hangs in this loop (gEndOfFrame never set) for some
-       * carts though it runs fine on host/qemu. Keep the watchdog alive during a
-       * long/stuck frame, and if it truly never ends, dump the stuck state and
-       * bail so we get a log instead of a silent watchdog reset to the menu. */
-      if ((++_ufguard & 0x1FFFFul) == 0) wdog_refresh();
-      if (_ufguard > 4000000ul)
-      {
-         printf("[lynx] UF STUCK cyc=%lu next=%lu eof=%lu sleep=%lu\n",
-                (unsigned long)gSystemCycleCount, (unsigned long)gNextTimerEvent,
-                (unsigned long)gEndOfFrame, (unsigned long)gSystemCPUSleep);
-         break;
-      }
-#endif
       if(gSystemCycleCount>=gNextTimerEvent)
       {
-#ifdef TARGET_GNW
-         /* mCpu->Update() is one instruction (no loop) — only mMikie->Update()
-          * loops, so the inner hang is here. Log each mikie call (capped) with
-          * the cycle/timer values BEFORE it; the LAST line before the device
-          * stalls = the mikie call that hung + its stuck cyc/next. */
-         static unsigned long _mk = 0;
-         if (_mk < 3000) printf("Mk%lu c=%lu n=%lu\n", _mk,
-                                (unsigned long)gSystemCycleCount,
-                                (unsigned long)gNextTimerEvent);
-         _mk++;
-#endif
          mMikie->Update();
       }
 
